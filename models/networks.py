@@ -440,13 +440,14 @@ class Identity(nn.Module):
 
 
 class Transformer(nn.Module):
-    def __init__(self, args):
+    def __init__(self,args):
         super(Transformer, self).__init__()
-        self.emb_dims = args.emb_dims
+        self.emb_dims=args.emb_dims
         self.N = args.n_blocks
-        self.dropout = args.dropout
-        self.ff_dims = args.ff_dims
-        self.n_heads = args.n_heads
+        self.dropout=args.dropout
+        self.ff_dims=args.ff_dims
+        self.n_heads=args.n_heads
+        self.n_transf_layers=args.n_transf_layers
         c = copy.deepcopy
         attn = MultiHeadedAttention(self.n_heads, self.emb_dims)
         ff = PositionwiseFeedForward(self.emb_dims, self.ff_dims, self.dropout)
@@ -455,24 +456,56 @@ class Transformer(nn.Module):
                                     nn.Sequential(),
                                     nn.Sequential(),
                                     nn.Sequential())
+        self.linear=nn.Linear(2*self.emb_dims*self.n_transf_layers,2*self.emb_dims)
 
+       
+        
     def forward(self, *input):
-        src = input[0]
-        tgt = input[1]
-        src = src.transpose(2, 1).contiguous()
-        tgt = tgt.transpose(2, 1).contiguous()
+        print(type(input)) # input is a tuple
+        src = input[0] # (batch,input_size,embedding)
+        src=torch.swapaxes(src,1,2)
+        print(src.size())
+        tgt = input[1] # (batch,input_size,embedding)
+        tgt=torch.swapaxes(tgt,1,2)
+        #print(src.size())
+        print(tgt.size())
+        print("Checking source and target devices in transformer network")
+        print(src.get_device()==tgt.get_device())
+        if torch.cuda.is_available():
+            print ("CUDA")
+            print(src.get_device())
+        else:
+            print("CPU")
+       
 
-        #src_embedding_self = self.model(src, src, None, None).transpose(2, 1).contiguous()
-        #tgt_embedding_self = self.model(tgt, tgt, None, None).transpose(2, 1).contiguous()
-
-        src_embedding = self.model(src, tgt, None, None).transpose(2, 1).contiguous()
-        tgt_embedding = self.model(tgt, src, None, None).transpose(2, 1).contiguous()
-
-        #src_embedding = src_embedding_self + src_embedding_cross
-        #tgt_embedding = tgt_embedding_self + tgt_embedding_cross
-
-        return src_embedding, tgt_embedding
-
+        concatenated_output=torch.empty(src.shape[0],src.shape[1],2*self.emb_dims*self.n_transf_layers).to(src.device)
+        #concatenated_output=torch.ones(src.shape[0],src.shape[1]).to(src.device)
+        #print("checking device of the concatenated output")
+        print(concatenated_output.get_device())
+        # shape(batch,input_size,2*emb_dims*no of layers)
+        for layer in range(self.n_transf_layers):
+            #phi x (phix=decoder_learning+src)
+            #tgt_embedding = self.model(src, tgt, None, None).transpose(1, 0).contiguous()+src.transpose(1,0)
+            #original
+            #src=src.transpose(2,1).contiguous()
+            #tgt=tgt.transpose(2,1).contiguous()
+            tgt_embedding = self.model(src, tgt, None, None)+src
+            src_embedding = self.model(tgt, src, None, None)+tgt
+            #original
+            #tgt_embedding = self.model(src, tgt, None, None).transpose(2,1).contiguous()+src.transpose(2,1).contiguous()
+            # phi y
+            #src_embedding = self.model(tgt, src, None, None).transpose(1, 0).contiguous()+tgt.transpose(1,0)
+            #original
+            #src_embedding = self.model(tgt, src, None, None).transpose(2,1).contiguous()+tgt.transpose(2,1).contiguous()
+            if layer==0:
+                concatenated_output=torch.cat((tgt_embedding,src_embedding),dim=2)
+            else:
+                concatenated_output=torch.cat((concatenated_output,tgt_embedding,src_embedding),dim=2)
+            src,tgt=tgt_embedding,src_embedding 
+        
+        final_output=self.linear(concatenated_output)
+        return final_output[:,:,0],final_output[:,:,1]
+    
 class Discriminator(nn.Module):
     def __init__(self, args):
         super(Discriminator, self).__init__()
@@ -669,11 +702,16 @@ class LNet2(nn.Module):
         
         src_embedding, src_idx, src_knn_pts, _ = self.emb_nn(src.transpose(2,1).contiguous())   #<bxdxN>
         tgt_embedding, _, tgt_knn_pts, _ = self.emb_nn(tgt.transpose(2,1).contiguous())   #<bxdxN>
+        print("source embedding shape: Fx")
+        print(src_embedding.shape)
+        print("Target embedding shape is Fy")
+        print(tgt_embedding.shape)
 
+        #src_embedding_p, tgt_embedding_p = self.pointer(src_embedding, tgt_embedding)
         src_embedding_p, tgt_embedding_p = self.pointer(src_embedding, tgt_embedding)
 
-        src_embedding = src_embedding + src_embedding_p
-        tgt_embedding = tgt_embedding + tgt_embedding_p
+        #src_embedding = src_embedding + src_embedding_p
+        #tgt_embedding = tgt_embedding + tgt_embedding_p
 
         distance_map = pairwise_distance_batch(src_embedding, tgt_embedding) #[b, n, m]
 
