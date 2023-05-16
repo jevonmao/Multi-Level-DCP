@@ -22,9 +22,9 @@ print(G_sigma)
 path = r'D:\kitti_group\2011_09_30_drive_0018_sync_tfvpr\gt_pose.npy'
 radius = 6378137
 
-gt_pose = np.load(path)
-gt_pose[:, :2] *= np.pi / 180
-lat_0 = gt_pose[0, 0]
+gt_pose = np.load(path) # getting pose from ground truth data
+gt_pose[:, :2] *= np.pi / 180 # multiplying the pose to convert to radians
+lat_0 = gt_pose[0, 0] 
 gt_pose[:, 1] *= radius * np.cos(lat_0)
 gt_pose[:, 0] *= radius
 gt_pose[:, 1] -= gt_pose[0, 1]

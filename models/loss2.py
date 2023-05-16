@@ -70,14 +70,14 @@ class ChamferLoss(nn.Module):
 	def batch_pairwise_dist(self,x,y):
 		bs, num_points_x, points_dim = x.size()
 		_, num_points_y, _ = y.size()
-		xx = torch.bmm(x, x.transpose(2,1))
+		xx = torch.bmm(x, x.transpose(2,1)) # generates a square matrix of size (batches,no of points,no of points)
 		yy = torch.bmm(y, y.transpose(2,1))
-		zz = torch.bmm(x, y.transpose(2,1))
+		zz = torch.bmm(x, y.transpose(2,1)) # of size (batches,no of points,no of points)
 		if self.use_cuda:
 			dtype = torch.cuda.LongTensor
 		else:
 			dtype = torch.LongTensor
-		diag_ind_x = torch.arange(0, num_points_x).type(dtype)
+		diag_ind_x = torch.arange(0, num_points_x).type(dtype) # 1d tensor of all indices.
 		diag_ind_y = torch.arange(0, num_points_y).type(dtype)
 		#brk()
 		rx = xx[:, diag_ind_x, diag_ind_x].unsqueeze(1).expand_as(zz.transpose(2,1))
@@ -140,10 +140,30 @@ def bce_ch(src_trans, tgt, src_key_trans, tgt_key, src_key_knn, tgt_key_knn, pre
 
 	#chamfer_loss = ch(source, template)
 
-	print('Gal loss:', gal_loss)
-	print('bce loss:', bce_loss)
+	print('Gal loss:', gal_loss) # investigate gal loss and chamfer loss similarities. 
+	print('bce loss:', bce_loss) # works best for dense frames with good initialization. 
 	print('neighborhood loss:', neighborhood_consensus_loss)
 
 
-	return gal_loss + neighborhood_consensus_loss 
-    
+	return gal_loss 
+
+'''
+want to implement supervised loss function that computes the difference between 
+the ground truth poses and predicted poses in a similar manner to DCP. 
+I should focus on this for this time. 
+'''
+
+class SupervisedLoss(nn.Module):
+	def __init__(self):
+		super(SupervisedLoss, self).__init__()
+		self.use_cuda = torch.cuda.is_available()
+	
+	def forward(self,preds,gts):
+		pass
+		'''
+		predictions are the output from the network. should be
+		a transformation matrix of shape (4 by 4 by number of examples or sequences)
+		and gts are the ground truth pose estimations given of the same shape.
+		'''
+
+

@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from sklearn.metrics import mean_squared_error
 
 from models import utils, loss2, deepmapping2
-from data_loader import kitti_data, kitti_data_test
+#from data_loader import kitti_data, kitti_data_test
 from lib.timer import AverageMeter
 import logging
 
@@ -96,7 +96,7 @@ def icp_o3d(src,dst,voxel_size=1):
     R = transformation[:3, :3]
     t = transformation[:3, 3:]
     print(transformation.numpy())
-    return R.numpy(), t.numpy()
+    return R.numpy(), t.numpy(),transformation.numpy()
 
 if __name__ == '__main__':    
 

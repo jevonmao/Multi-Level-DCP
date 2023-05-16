@@ -2,6 +2,7 @@ import logging
 import random
 import torch
 import torch.utils.data
+from torch.utils.data import DataLoader
 import numpy as np
 import glob
 import os
@@ -78,13 +79,19 @@ class PairDataset(torch.utils.data.Dataset):
 
 class KITTIPairDataset(PairDataset):
     AUGMENT = None 
-    DATA_FILES = {'train': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/train_kitti.txt',
-                'val': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/val_kitti.txt',
-                'test': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/train_kitti.txt'}
+    #DATA_FILES = {'train': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/train_kitti.txt',
+                #'val': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/val_kitti.txt',
+                #'test': 'C:/Users/praop/OneDrive/Desktop/NYU/AI4CE/code/DeepMapping++/data_loader_kitti/config/train_kitti.txt'}
 
     #DATA_FILES = {'train': '/scratch/pr2257/ai4ce/DeepMapping++/data_loader_kitti/config/train_kitti.txt',
     #            'val': '/scratch/pr2257/ai4ce/DeepMapping++/data_loader_kitti/config/val_kitti.txt',
     #            'test': '/scratch/pr2257/ai4ce/DeepMapping++/data_loader_kitti/config/test_kitti.txt'}
+
+    DATA_FILES={'train': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/train_kitti.txt',
+               'val': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/val_kitti.txt',
+                'test': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/test_kitti.txt'}
+
+
     TEST_RANDOM_ROTATION = True
     IS_ODOMETRY = True 
 
@@ -92,12 +99,14 @@ class KITTIPairDataset(PairDataset):
     def __init__(self, phase='train', transform=None, random_rotation=True, random_scale=False, manual_seed=False, config=None):
 
         if self.IS_ODOMETRY:
-            self.root = root = 'D:\KITTI_odom\dataset_velodyne'
+            #self.root = root = 'D:\KITTI_odom\dataset_velodyne'
             #self.root = root = '/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne'
+            #self.rooot=root='/scratch/fsa4859/deepmapping_pcr/dataset/sequences'
+            self.root=root='/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset'
 
             random_rotation = self.TEST_RANDOM_ROTATION
 
-        self.icp_path = os.path.join('D:\KITTI_odom\dataset_velodyne', 'icp_2')
+        self.icp_path = os.path.join('/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset', 'icp_10')
         #self.icp_path = os.path.join('/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne', 'icp')
         pathlib.Path(self.icp_path).mkdir(parents=True, exist_ok=True)
 
@@ -314,16 +323,16 @@ class KITTIPairDataset(PairDataset):
 
 class KITTINMPairDataset(KITTIPairDataset):
 
-    MIN_DIST = 2
+    MIN_DIST = 2 # high overlapping=2, low overlapping=10
 
     def __init__(self, phase, transform=None, random_rotation=True, random_scale=True,manual_seed=False, config=None):
 
         if self.IS_ODOMETRY:
-            self.root = root = 'D:\KITTI_odom\dataset_velodyne'
+            self.root = root = '/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset'
             #self.root = root = '/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne'
             random_rotation = self.TEST_RANDOM_ROTATION
 
-        self.icp_path = os.path.join('D:\KITTI_odom\dataset_velodyne', 'icp_2')
+        self.icp_path = os.path.join('/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset', 'icp_10')
         #self.icp_path = os.path.join('/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne', 'icp')
         pathlib.Path(self.icp_path).mkdir(parents=True, exist_ok=True)
 
@@ -364,9 +373,21 @@ class KITTINMPairDataset(KITTIPairDataset):
                         for item in [(8, 15, 58)]:
                             if item in self.files:
                                 self.files.pop(self.files.index(item))
-        self.files = self.files[0:100]
+        #self.files = self.files[0:100] return back when testing multi-level transformer
+        
 
 #dataset = KITTINMPairDataset('train')
+#train_loader_trial = DataLoader(dataset, batch_size=4, shuffle=False)
+#print(type(train_loader_trial))
+
+#for  index, (obs_batch, pose_batch, gt_trans) in enumerate(train_loader_trial):
+    #print(f"index is {index} and type is {type(index)} ")
+    #print(f"obs batch is  {obs_batch} and type is {type(obs_batch)} and shape is {obs_batch.shape} ")
+    #print(f"pose batch is  {pose_batch} and type is {type(pose_batch)} and shape is {pose_batch.shape} ")
+    #print(f"gt_trans  is  {gt_trans} and type is {type(gt_trans)} and shape is {gt_trans.shape} ")
+
+
+
 #pc_pair, pose = dataset.__getitem__(3)
 
 #print(pc_pair.shape)
