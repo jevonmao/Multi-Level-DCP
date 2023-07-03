@@ -6,6 +6,9 @@ import torch.nn.functional as F
 from scipy.spatial.transform import Rotation
 import random
 
+random.seed(69)
+np.random.seed(69)
+torch.manual_seed(69)
 def generate_rand_rotm(x_lim=5.0, y_lim=5.0, z_lim=180.0):
     '''
     Input:

@@ -288,7 +288,7 @@ if __name__ == '__main__':
 
     # Save parser arguments
     utils.save_opt(checkpoint_dir, opt)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     print("Device:", device)
 
     print('loading dataset........')

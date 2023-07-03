@@ -14,7 +14,9 @@ import open3d as o3d
 
 kitti_cache = {}
 kitti_icp_cache = {}
-
+random.seed(69)
+np.random.seed(69)
+torch.manual_seed(69)
 
 def voxel_downsample(xyz, voxel_size=0.5):
     pcd = o3d.geometry.PointCloud()
@@ -87,9 +89,9 @@ class KITTIPairDataset(PairDataset):
     #            'val': '/scratch/pr2257/ai4ce/DeepMapping++/data_loader_kitti/config/val_kitti.txt',
     #            'test': '/scratch/pr2257/ai4ce/DeepMapping++/data_loader_kitti/config/test_kitti.txt'}
 
-    DATA_FILES={'train': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/train_kitti.txt',
-               'val': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/val_kitti.txt',
-                'test': '/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/test_kitti.txt'}
+    DATA_FILES={'train': 'configs/kitti/train_kitti.txt',
+               'val': 'configs/kitti/val_kitti.txt',
+                'test': 'configs/kitti/test_kitti.txt'}
 
 
     TEST_RANDOM_ROTATION = True
@@ -102,11 +104,11 @@ class KITTIPairDataset(PairDataset):
             #self.root = root = 'D:\KITTI_odom\dataset_velodyne'
             #self.root = root = '/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne'
             #self.rooot=root='/scratch/fsa4859/deepmapping_pcr/dataset/sequences'
-            self.root=root='/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset'
+            self.root=root='/mnt/NAS/data/jevonmao/kitti/dataset'
 
             random_rotation = self.TEST_RANDOM_ROTATION
 
-        self.icp_path = os.path.join('/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset', 'icp_10')
+        self.icp_path = os.path.join('/mnt/NAS/data/jevonmao/kitti/dataset', 'icp_10')
         #self.icp_path = os.path.join('/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne', 'icp')
         pathlib.Path(self.icp_path).mkdir(parents=True, exist_ok=True)
 
@@ -132,9 +134,8 @@ class KITTIPairDataset(PairDataset):
                     pair_time = time_diff + start_time
                     if pair_time in inames:
                         self.files.append((drive_id, start_time, pair_time))
-
-
-
+        #self.files.remove(4520)
+        
     def get_mininum_points(self, subset_names):
 
         pcd = o3d.geometry.PointCloud()
@@ -260,6 +261,7 @@ class KITTIPairDataset(PairDataset):
 
         key = '%d_%d_%d' % (drive, t0, t1)
         filename = self.icp_path + '/' + key + '.npy'
+
         if key not in kitti_icp_cache:
             if not os.path.exists(filename):
 
@@ -304,9 +306,9 @@ class KITTIPairDataset(PairDataset):
 
         pcd0 = voxel_downsample(xyz0, self.voxel_size)
         pcd1 = voxel_downsample(xyz1, self.voxel_size)
-        
-        pcd0 = pcd0[:4415, :]
-        pcd1 =  pcd1[:4415, :]
+        #4395
+        pcd0 = pcd0[:4395, :]
+        pcd1 =  pcd1[:4395, :]
 
         pcd0 = pcd0[::3, :]
         pcd1 = pcd1[::3, :]
@@ -314,12 +316,21 @@ class KITTIPairDataset(PairDataset):
         pc_pair = [pcd0, pcd1]
 
         #pc_pair = [xyz0, xyz1]
-        pc_pair = np.asarray(pc_pair)
-
-        pc_pair_th = torch.from_numpy(pc_pair).float()
         pose = torch.zeros(1,4,dtype=torch.float32)
-
-        return pc_pair_th, pose, trans
+        try:
+            pc_pair = np.asarray(pc_pair)
+            pc_pair_th = torch.from_numpy(pc_pair).float()
+            return pc_pair_th, pose, trans
+        
+        except ValueError as e:
+            print(f"Error occured while getting dataset item: {e}")
+            print(f"Index of error: {idx}")
+            print(f"pcd0: {pcd0.shape}\npcd1: {pcd1.shape}\nxyz0: {xyz0.shape}\nxyz1: {xyz1.shape}")
+            print(f"")
+            empty_pc_pair_th = torch.from_numpy(np.zeros([2, 1465, 3])).float()
+            return empty_pc_pair_th, pose, trans
+        
+        
 
 class KITTINMPairDataset(KITTIPairDataset):
 
@@ -328,11 +339,11 @@ class KITTINMPairDataset(KITTIPairDataset):
     def __init__(self, phase, transform=None, random_rotation=True, random_scale=True,manual_seed=False, config=None):
 
         if self.IS_ODOMETRY:
-            self.root = root = '/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset'
+            self.root = root = '/mnt/NAS/data/jevonmao/kitti/dataset'
             #self.root = root = '/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne'
-            random_rotation = self.TEST_RANDOM_ROTATION
+            #random_rotation = self.TEST_RANDOM_ROTATION
 
-        self.icp_path = os.path.join('/scratch/fsa4859/deepmapping_pcr/D:\KITTI_odom\dataset_velodyne/dataset', 'icp_10')
+        self.icp_path = os.path.join('/mnt/NAS/data/jevonmao/kitti/dataset', 'icp_10')
         #self.icp_path = os.path.join('/scratch/pr2257/ai4ce/data/KITTI_odom/dataset_velodyne', 'icp')
         pathlib.Path(self.icp_path).mkdir(parents=True, exist_ok=True)
 
@@ -392,3 +403,7 @@ class KITTINMPairDataset(KITTIPairDataset):
 
 #print(pc_pair.shape)
 #print(len(dataset.files))
+
+if __name__ == '__main__':    
+    dataset = KITTINMPairDataset(phase='train')
+    print([i.shape for i in dataset[4520]])

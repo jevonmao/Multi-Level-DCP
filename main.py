@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 from sklearn.metrics import mean_squared_error
 
 from models import utils, loss2, deepmapping2
-from data_loader import kitti_data
+#from data_loader import kitti_data
 from data_loader_kitti import kitti_loader_exp2
 from data_loader_kitti import data_load_test
 from lib.timer import AverageMeter
@@ -23,8 +23,8 @@ import open3d as o3d
 
 # Code runs deterministically 
 torch.backends.cudnn.deterministic = True
-torch.manual_seed(999)
-
+np.random.seed(69)
+torch.manual_seed(69)
 
 def eval_metric(rotation, translation, transformation_gt):
 
@@ -116,22 +116,26 @@ if __name__ == '__main__':
 
     # Save parser arguments
     utils.save_opt(checkpoint_dir, opt)
-    device = torch.device("cuda")
+    device = torch.device("cuda:2")
     print("Device:", device)
 
     print('loading dataset........')
     #train_dataset = kitti_data.Kitti('D:\kitti_group', opt.traj, opt.voxel_size, init_pose=None, 
             #group=True, group_size=9)
     #train_loader = DataLoader(train_dataset, batch_size=4, num_workers=8)
-    dataset = kitti_loader_exp2.KITTINMPairDataset(phase='train')
-    train_loader = DataLoader(dataset, batch_size=opt.batch_size, shuffle=False)
+    dataset = kitti_loader_exp2.KITTINMPairDataset(phase='train',
+                                                   random_rotation=False,
+                                                   random_scale=False,)
+    train_loader = DataLoader(dataset,
+                              batch_size=opt.batch_size,
+                              num_workers=8,
+                              shuffle=False)
 
     #test_dataset = data_load_test.KITTI('/mnt/NAS/home/xinhao/deepmapping/main/data/kitti/', opt.traj, opt.voxel_size, init_pose=None, 
             #group=True, group_size=9)
     test_dataset = kitti_loader_exp2.KITTINMPairDataset(phase='test')
     test_loader = DataLoader(test_dataset, batch_size=4, num_workers=8)
     
-
     #test_loader =  DataLoader(dataset_test, batch_size=opt.batch_size, shuffle=False)
     loss_fn = eval('loss2.'+opt.loss)
     print('creating model......')
@@ -166,9 +170,9 @@ if __name__ == '__main__':
         #print("Model device:",model.device())
         print("Training epoch:", epoch)
         
-
         for index, (obs_batch, pose_batch, gt_trans) in enumerate(train_loader):
-
+            print("-" * 30 + "\n")
+            print(f"Now training dataset pair index: {index}")
             print(device)
             # consider adding to(device)
             obs_batch = obs_batch.to(device)
@@ -183,7 +187,7 @@ if __name__ == '__main__':
             #loss_supervised = F.mse_loss(torch.matmul(R_pred.transpose(2, 1), gt_trans[:, :3, :3]), identity) \
             #    + F.mse_loss(t_pred,  gt_trans[:, :3, 3].view(opt.batch_size, 3))
 
-                       
+                    
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -191,7 +195,7 @@ if __name__ == '__main__':
             training_loss += loss.item()
 
             #print('training loss', training_loss)
-        
+
         training_loss_epoch = training_loss / len(train_loader)
         print('[{}/{}], training loss: {:.4f}'.format(
                 epoch+1,opt.n_epochs,training_loss_epoch))
@@ -212,6 +216,8 @@ if __name__ == '__main__':
             with torch.no_grad():
                 model.eval()
                 for index, (obs_batch_test, pose_batch_test, gt_trans) in enumerate(train_loader):
+                    print("-" * 30 + "\n")
+                    print(f"Now validating dataset pair index: {index}")
                     # consider adding to device
                     obs_batch_test = obs_batch_test.to(device)
                     pose_batch_test = pose_batch_test.to(device)
@@ -302,5 +308,4 @@ if __name__ == '__main__':
                     utils.plot_global_point_cloud_KITTI(source_pc_est_np[10, :, :], template_pc_np[10, :, :], checkpoint_dir, plot_num=2, **kwargs)
                     utils.plot_global_point_cloud_KITTI(source_pc_est_np[30, :, :], template_pc_np[30, :, :], checkpoint_dir, plot_num=3, **kwargs)
                 
-
-                
+#python main.py -b 9 &> results/logs/$(date +"%Y-%m-%dT%H:%M:%S").log &

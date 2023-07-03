@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+torch.manual_seed(69)
 INF = 1000000
 
 class BCEWithLogitsLoss2(nn.Module):
@@ -90,6 +90,7 @@ class GlobalAlignLoss(nn.Module):
 	def __init__(self):
 		super(GlobalAlignLoss, self).__init__()
 		self.use_cuda = torch.cuda.is_available()
+		self.device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
 
 	def forward(self,preds,gts, c):
 		P = self.batch_pairwise_dist(gts, preds)
@@ -116,8 +117,8 @@ class GlobalAlignLoss(nn.Module):
 			dtype = torch.cuda.LongTensor
 		else:
 			dtype = torch.LongTensor
-		diag_ind_x = torch.arange(0, num_points_x).type(dtype)
-		diag_ind_y = torch.arange(0, num_points_y).type(dtype)
+		diag_ind_x = torch.arange(0, num_points_x, device=self.device).type(dtype)
+		diag_ind_y = torch.arange(0, num_points_y, device=self.device).type(dtype)
 		rx = xx[:, diag_ind_x, diag_ind_x].unsqueeze(1).expand_as(zz.transpose(2,1))
 		ry = yy[:, diag_ind_y, diag_ind_y].unsqueeze(1).expand_as(zz)
 		P = (rx.transpose(2,1) + ry - 2*zz)

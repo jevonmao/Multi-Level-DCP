@@ -10,14 +10,15 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
 
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from models import utils, loss2, deepmapping2
-from data_loader import kitti_data, kitti_data_test
+from data_loader_kitti import kitti_loader_exp2
 from lib.timer import AverageMeter
 import logging
 
 import open3d as o3d
+import math
 
 # Code runs deterministically 
 torch.backends.cudnn.deterministic = True
@@ -74,7 +75,7 @@ def groud_truth_reg(pairwise_batch, gt_trans_batch):
     return src_trans, tmp
 
 
-def metric(R_pred, t_pred, T_gt):
+def MSEMetric(R_pred, t_pred, T_gt):
 
     k = T_gt.shape[0]
     rte_meter, rre_meter = AverageMeter(), AverageMeter()
@@ -87,25 +88,42 @@ def metric(R_pred, t_pred, T_gt):
         rte_meter.update(rte)
         rre_meter.update(rre)
 
-    print('RTE:', rte_meter.avg)
-    print('RRE:', rre_meter.avg)
+    print('MSE(T):', rte_meter.avg)
+    print('MSE(R):', rre_meter.avg)
 
     return rre_meter.avg, rte_meter.avg
 
+def MAEMetric(R_pred, t_pred, T_gt):
+    k = T_gt.shape[0]
+    rte_meter, rre_meter = AverageMeter(), AverageMeter()
+
+    for i in range(k):
+        identity = np.eye(3)
+        rre = mean_absolute_error(np.transpose(R_pred[i, :, :].reshape(3,3)) @ T_gt[i, :3, :3].reshape(3,3), identity)
+        rte = mean_absolute_error(t_pred[i, :].reshape(3, 1), T_gt[i, :3, 3].reshape(3, 1))
+
+        rte_meter.update(rte)
+        rre_meter.update(rre)
+
+    print('MAE(T):', rte_meter.avg)
+    print('MAE(R):', rre_meter.avg)
+
+    return rre_meter.avg, rte_meter.avg
 
 if __name__ == '__main__':    
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name',type=str,default='exp2_test_gt',help='experiment name')
-    parser.add_argument('-e','--n_epochs',type=int,default=120,help='number of epochs')
-    parser.add_argument('-b','--batch_size',type=int,default=2,help='batch_size')
+    parser.add_argument('--name',type=str,default='eval',help='experiment name')
+    parser.add_argument('-e','--n_epochs',type=int,default=100,help='number of epochs')
+    parser.add_argument('-b','--batch_size',type=int,default=4,help='batch_size')
     parser.add_argument('-l','--loss',type=str,default='bce_ch',help='loss function')
     parser.add_argument('-n','--n_samples',type=int,default=45,help='number of sampled unoccupied points along rays')
-    parser.add_argument('--lr',type=float,default=0.001,help='learning rate')
-    parser.add_argument('-d','--root',type=str,default='/mnt/NAS/home/xinhao/deepmapping/main/data/kitti/',help='root path')
+    parser.add_argument('--lr',type=float,default=0.01,help='learning rate') # default is 0.001
+    #parser.add_argument('-d','--root',type=str,default='/mnt/NAS/home/xinhao/deepmapping/main/data/kitti/',help='root path')
+    parser.add_argument('-d','--root',type=str,default='/scratch/fsa4859/deepmapping_pcr/data_loader_kitti/config/test_kitti.txt',help='root path')
     parser.add_argument('-t','--traj',type=str,default='2011_09_30_drive_0018_sync_tfvpr',help='trajectory file folder')
     parser.add_argument('-v','--voxel_size',type=float,default=1,help='size of downsampling voxel grid')
-    parser.add_argument('-m','--model', type=str, default=None,help='pretrained model name')
+    parser.add_argument('-m','--model', type=str, default='results/exp2_train_4/model_best.pth',help='pretrained model name')
     parser.add_argument('-i','--init', type=str, default=None,help='init pose')
     parser.add_argument('--log_interval',type=int,default=1,help='logging interval of saving results')
     parser.add_argument('--emb_nn', type=str, default='dgcnn', metavar='N',
@@ -117,12 +135,14 @@ if __name__ == '__main__':
     parser.add_argument('--head', type=str, default='svd', metavar='N',
                         choices=['mlp', 'svd', ],
                         help='Head to use, [mlp, svd]')
-    parser.add_argument('--emb_dims', type=int, default=256, metavar='N',
+    parser.add_argument('--emb_dims', type=int, default=512, metavar='N',
                         help='Dimension of embeddings')
     parser.add_argument('--n_blocks', type=int, default=1, metavar='N',
                         help='Num of blocks of encoder&decoder')
     parser.add_argument('--n_heads', type=int, default=4, metavar='N',
                         help='Num of heads in multiheadedattention')
+    parser.add_argument('--n_transf_layers',type=int,default=3,metavar='N',
+                        help="Number of transformer layers")
     parser.add_argument('--ff_dims', type=int, default=1024, metavar='N',
                         help='Num of dimensions of fc in transformer')
     parser.add_argument('--dropout', type=float, default=0.0, metavar='N',
@@ -135,7 +155,7 @@ if __name__ == '__main__':
                         help='Whether to use cycle consistency')
     parser.add_argument('--unseen', type=bool, default=False, metavar='N',
                         help='Wheter to test on unseen category')
-    parser.add_argument('--num_keypoints', type=int, default=800, metavar='N',
+    parser.add_argument('--num_keypoints', type=int, default=600, metavar='N',
                         help='Number of key poinits')
     parser.add_argument('--des_dim', type=int, default=256, metavar='N',
                         help='Neiborhood descriptor dimension')
@@ -150,13 +170,15 @@ if __name__ == '__main__':
 
     # Save parser arguments
     utils.save_opt(checkpoint_dir, opt)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
     print("Device:", device)
 
     print('loading dataset........')
 
-    test_dataset = kitti_data.Kitti('D:\kitti_group', opt.traj, opt.voxel_size, init_pose=None, 
-            group=True, group_size=9)
+    test_dataset = kitti_loader_exp2.KITTINMPairDataset(phase='test',
+                                               random_rotation=False,
+                                               random_scale=False,)
+    
     test_loader = DataLoader(test_dataset, batch_size=2, num_workers=4)
 
     #test_loader =  DataLoader(dataset_test, batch_size=opt.batch_size, shuffle=False)
@@ -165,9 +187,9 @@ if __name__ == '__main__':
 
     model = deepmapping2.DeepMappingKITTI(loss_fn=loss_fn, args=opt,n_samples=opt.n_samples).to(device)
 
-    PATH = r'C:\Users\praop\OneDrive\Desktop\NYU\AI4CE\results\exp2_train_4\model_best.pth'
+    PATH = opt.model
 
-    RRE, RTE = [], []
+    MSE_T, MSE_R, MAE_T, MAE_R = [], [], [], []
 
     for index, (obs_batch, pose_batch, gt_trans_batch) in enumerate(test_loader):
         obs_batch = obs_batch.to(device)
@@ -181,24 +203,33 @@ if __name__ == '__main__':
         T_gt = gt_trans_batch.cpu().detach().numpy()
      
 
-        rre_batch, rte_batch = metric(r_pred, t_pred, T_gt)
+        mse_r_batch, mse_t_batch = MSEMetric(r_pred, t_pred, T_gt)
+        mae_r_batch, mae_t_batch = MAEMetric(r_pred, t_pred, T_gt)
 
         print('---------------------------')
-        print('rre batch:', rre_batch)
-        print('rtr batch:', rte_batch)
+        print('MSE(R) batch:', mse_r_batch)
+        print('MSE(T) batch:', mse_t_batch)
         print('---------------------------')
 
-        RRE.append(rre_batch)
-        RTE.append(rte_batch)
+        MSE_R.append(mse_r_batch)
+        MSE_T.append(mse_t_batch)
+        MAE_R.append(mae_r_batch)
+        MAE_T.append(mae_t_batch)
         
+    average_mse_r = sum(MSE_R) / len(MSE_R)
+    average_mse_t = sum(MSE_T) / len(MSE_T)
+    average_mae_r = sum(MAE_R) / len(MAE_R)
+    average_mae_t = sum(MAE_T) / len(MAE_T)
 
-    average_rre = sum(RRE) / len(RRE)
-    average_rte = sum(RTE) / len(RTE)
+    print('MSE(R):', average_mse_r)
+    print(f'MSE(T): {average_mse_t}')
+    print(f'RMSE(R): {math.sqrt(average_mse_r)}')
+    print(f'RMSE(T): {math.sqrt(average_mse_t)}')
+    print('MAE(R):', average_mae_r)
+    print(f'MAE(T): {average_mae_t}')
 
-    print('Average RRE:', average_rre)
-
-    print('Maxmimum RRE', max(average_rre))
-    
+    # print('Maxmimum RRE: ', max(RRE))
+    # print('Maxmimum RTE: ', max(RTE))
         
     #pair_pcs = np.load(r'C:\Users\praop\OneDrive\Desktop\NYU\AI4CE\code\DeepMapping_pcr\data_loader\group_pairs.npy')
     #pair_gt_trans = np.load(r'C:\Users\praop\OneDrive\Desktop\NYU\AI4CE\code\DeepMapping_pcr\data_loader\group_gt_trans.npy')

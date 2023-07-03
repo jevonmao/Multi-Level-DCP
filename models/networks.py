@@ -14,6 +14,9 @@ from pytorch3d.ops import knn_points, knn_gather
 
 from .utils import transform_to_global_KITTI
 
+np.random.seed(69)
+torch.manual_seed(69)
+
 def get_and_init_FC_layer(din, dout):
     li = nn.Linear(din, dout)
     nn.init.xavier_uniform_(
@@ -44,7 +47,7 @@ def pairwise_distance_batch(x,y):
     yy = torch.sum(torch.mul(y,y),1, keepdim = True) #[b,1,n]
     inner = -2*torch.matmul(x.transpose(2,1),y) #[b,n,n]
     pair_distance = xx.transpose(2,1) + inner + yy #[b,n,n]
-    device = torch.device('cuda')
+    device = torch.device("cuda:2")
     zeros_matrix = torch.zeros_like(pair_distance,device = device)
     pair_distance_square = torch.where(pair_distance > 0.0,pair_distance,zeros_matrix)
     error_mask = torch.le(pair_distance_square,0.0)
@@ -102,7 +105,7 @@ def get_graph_feature(x, k=32):
     # x = x.squeeze()
     idx = knn(x, k=k)  # (batch_size, num_points, k)
     batch_size, num_points, _ = idx.size()
-    device = torch.device('cuda')
+    device = torch.device("cuda:2")
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
 
@@ -142,7 +145,7 @@ def get_graph_feature(x, k):
     idx = knn(x, k=k)  # (batch_size, num_points, k)
     idx2 = idx
     batch_size, num_points, _ = idx.size()
-    device = torch.device('cuda')
+    device = torch.device("cuda:2")
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
 
@@ -472,7 +475,7 @@ class Transformer(nn.Module):
         print("Checking source and target devices in transformer network")
         print(src.get_device()==tgt.get_device())
         if torch.cuda.is_available():
-            print ("CUDA")
+            print ("cuda:2")
             print(src.get_device())
         else:
             print("CPU")
@@ -582,7 +585,7 @@ def get_knn_index(x, k):
     idx = knn(x, k=k)  # (batch_size, num_points, k)
     idx2 = idx
     batch_size, num_points, _ = idx.size()
-    device = torch.device('cuda')
+    device = torch.device("cuda")
 
     idx_base = torch.arange(0, batch_size, device=device).view(-1, 1, 1) * num_points
 

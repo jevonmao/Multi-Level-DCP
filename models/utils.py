@@ -5,6 +5,9 @@ import os
 import json
 from scipy.spatial.transform import Rotation
 
+np.random.seed(69)
+torch.manual_seed(69)
+
 from matplotlib import pyplot as plt
 
 def generate_rand_rotm(x_lim=6.28, y_lim=6.28, z_lim=6.28):
@@ -68,6 +71,7 @@ def save_checkpoint(save_name, model, optimizer):
 
 
 def load_checkpoint(save_name, model, optimizer):
+    print(f"loading model from {save_name}")
     state = torch.load(save_name)
     model.load_state_dict(state['state_dict'])
     if optimizer is not None:

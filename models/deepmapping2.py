@@ -5,6 +5,9 @@ import torch.nn as nn
 from .networks import LNet2, MLP
 from .utils import transform_to_global_KITTI
 
+np.random.seed(69)
+torch.manual_seed(69)
+
 def get_M_net_inputs_labels(occupied_points, unoccupited_points):
     """
     get global coord (occupied and unoccupied) and corresponding labels

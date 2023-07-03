@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 
+np.random.seed(69)
+torch.manual_seed(69)
 '''
 a = torch.randn(4, 5000, 3)
 b = torch.randn(4, 5000, 3)

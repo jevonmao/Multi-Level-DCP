@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 
+torch.manual_seed(69)
 INF = 1000000
 
 class BCEWithLogitsLoss2(nn.Module):

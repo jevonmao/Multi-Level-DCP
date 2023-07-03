@@ -6,6 +6,8 @@ import open3d as o3D
 import glob
 from scipy.spatial.transform import Rotation
 
+np.random.seed(69)
+torch.manual_seed(69)
 def apply_rotation(pc, R):
     pc = pc @ R.T
     return pc

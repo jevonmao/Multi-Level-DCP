@@ -2,6 +2,8 @@ import torch
 import os
 import numpy as np
 
+np.random.seed(69)
+torch.manual_seed(69)
 '''
 gt poses can be extracted from numpy files. 
 '''

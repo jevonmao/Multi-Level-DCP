@@ -5,6 +5,9 @@ from torch.utils.data import Dataset, Sampler
 import open3d as o3d
 from tqdm import tqdm
 
+np.random.seed(69)
+torch.manual_seed(69)
+
 def find_valid_points(local_point_cloud):
     """
     find valid points in local point cloud

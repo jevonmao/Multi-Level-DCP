@@ -85,12 +85,22 @@ def icp_o3d(src,dst,voxel_size=1):
 
     # Save iteration wise `fitness`, `inlier_rmse`, etc. to analyse and tune result.
     save_loss_log = True
+    try:
+        registration_ms_icp = treg.multi_scale_icp(src_pcd, dst_pcd, voxel_sizes,
+                                            criteria_list,
+                                            max_correspondence_distances,
+                                            init_source_to_target, estimation)
+    except TypeError as e:
+        print(e)
+        print(f"Source pcd: {src_pcd}, of type: {type(src_pcd)}")
+        print(f"Destination pcd: {dst_pcd}, of type: {type(dst_pcd)}")
+        print(f"Voxel sizes: {voxel_sizes}, of type: {type(voxel_size)}")
+        print(f"Criteria list: {criteria_list}, of type: {type(criteria_list)}")
+        print(f"Max_correspondence_distances: {max_correspondence_distances}, of type: {type(max_correspondence_distances)}")
+        print(f"Init_source_to_target: {init_source_to_target}, of type: {type(init_source_to_target)}")
+        print(f"estimation: {estimation}, of type: {type(estimation)}")
+    
 
-    registration_ms_icp = treg.multi_scale_icp(src_pcd, dst_pcd, voxel_sizes,
-                                           criteria_list,
-                                           max_correspondence_distances,
-                                           init_source_to_target, estimation,
-                                           save_loss_log)
 
     transformation = registration_ms_icp.transformation
     R = transformation[:3, :3]
